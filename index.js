@@ -52,11 +52,12 @@ const archive = async ({productPath}) => {
     const archivePath = "/tmp/archive.zip"; // TODO Temporary file
 
     const args = [
-        "-c",           // Create an archive at the destination path
-        "-k",           // Create a PKZip archive
-        "--keepParent", // Embed the parent directory name src in dst_archive.
-        productPath,    // Source
-        archivePath,    // Destination
+        "-c",              // Create an archive at the destination path
+        "-k",              // Create a PKZip archive
+        "--keepParent",    // Embed the parent directory name src in dst_archive.
+        "--sequesterRsrc", // Don't destroy the UTF8 encoding
+        productPath,       // Source
+        archivePath,       // Destination
     ];
 
     try {
