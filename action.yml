@@ -51,12 +51,12 @@ inputs:
   verbose:
     description: "Verbose mode will print Notarization API responses."
     required: false
-    default: false
+    default: 'false'
 
 outputs:
   product-path:
     description: "Path to the product that was notarized"
 
 runs:
-  using: 'node12'
+  using: 'node16'
   main: 'dist/index.js'

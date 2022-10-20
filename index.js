@@ -18,24 +18,21 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
+const fs = require("fs");
 
-const fs = require('fs');
-
-const core = require('@actions/core');
-const execa = require('execa');
-const plist = require('plist');
-
+const core = require("@actions/core");
+const execa = require("execa");
+const plist = require("plist");
 
 const sleep = (ms) => {
-    return new Promise(res => setTimeout(res, ms));
+    return new Promise((res) => setTimeout(res, ms));
 };
-
 
 const parseConfiguration = () => {
     const configuration = {
-        productPath: core.getInput("product-path", {required: true}),
-        username: core.getInput("appstore-connect-username", {required: true}),
-        password: core.getInput("appstore-connect-password", {required: true}),
+        productPath: core.getInput("product-path", { required: true }),
+        username: core.getInput("appstore-connect-username", { required: true }),
+        password: core.getInput("appstore-connect-password", { required: true }),
         primaryBundleId: core.getInput("primary-bundle-id"),
         verbose: core.getInput("verbose") === "true",
     };
@@ -44,22 +41,19 @@ const parseConfiguration = () => {
         throw Error(`Product path ${configuration.productPath} does not exist.`);
     }
 
-    return configuration
+    return configuration;
 };
 
-
-const archive = async ({productPath}) => {
+const archive = async ({ productPath }) => {
     const archivePath = "/tmp/archive.zip"; // TODO Temporary file
-
     const args = [
-        "-c",              // Create an archive at the destination path
-        "-k",              // Create a PKZip archive
-        "--keepParent",    // Embed the parent directory name src in dst_archive.
+        "-c", // Create an archive at the destination path
+        "-k", // Create a PKZip archive
+        "--keepParent", // Embed the parent directory name src in dst_archive.
         "--sequesterRsrc", // Don't destroy the UTF8 encoding
-        productPath,       // Source
-        archivePath,       // Destination
+        productPath, // Source
+        archivePath, // Destination
     ];
-
     try {
         await execa("ditto", args);
     } catch (error) {
@@ -70,8 +64,7 @@ const archive = async ({productPath}) => {
     return archivePath;
 };
 
-
-const submit = async ({productPath, archivePath, primaryBundleId, username, password, verbose}) => {
+const submit = async ({ productPath, archivePath, primaryBundleId, username, password, verbose }) => {
     //
     // Make sure the product exists.
     //
@@ -108,26 +101,31 @@ const submit = async ({productPath, archivePath, primaryBundleId, username, pass
 
     const args = [
         "altool",
-        "--output-format", "json",
+        "--output-format",
+        "json",
         "--notarize-app",
-        "-f", archivePath,
-        "--primary-bundle-id", primaryBundleId,
-        "-u", username,
-        "-p", password
+        "-f",
+        archivePath,
+        "--primary-bundle-id",
+        primaryBundleId,
+        "-u",
+        username,
+        "-p",
+        password,
     ];
 
     if (verbose === true) {
         args.push("--verbose");
     }
 
-    let xcrun = execa("xcrun", args, {reject: false});
+    let xcrun = execa("xcrun", args, { reject: false });
 
     if (verbose == true) {
         xcrun.stdout.pipe(process.stdout);
         xcrun.stderr.pipe(process.stderr);
     }
 
-    const {exitCode, stdout, stderr} = await xcrun;
+    const { exitCode, stdout } = await xcrun;
 
     if (exitCode === undefined) {
         // TODO Command did not run at all
@@ -155,30 +153,22 @@ const submit = async ({productPath, archivePath, primaryBundleId, username, pass
     return response["notarization-upload"]["RequestUUID"];
 };
 
-
-const wait = async ({uuid, username, password, verbose}) => {
-    const args = [
-        "altool",
-        "--output-format", "json",
-        "--notarization-info",
-        uuid,
-        "-u", username,
-        "-p", password
-    ];
+const wait = async ({ uuid, username, password, verbose }) => {
+    const args = ["altool", "--output-format", "json", "--notarization-info", uuid, "-u", username, "-p", password];
 
     if (verbose === true) {
         args.push("--verbose");
     }
 
     for (let i = 0; i < 10; i++) {
-        let xcrun = execa("xcrun", args, {reject: false});
+        let xcrun = execa("xcrun", args, { reject: false });
 
         if (verbose == true) {
             xcrun.stdout.pipe(process.stdout);
             xcrun.stderr.pipe(process.stderr);
         }
 
-        const {exitCode, stdout, stderr} = await xcrun;
+        const { exitCode, stdout } = await xcrun;
 
         if (exitCode === undefined) {
             // TODO Command did not run at all
@@ -231,8 +221,8 @@ const main = async () => {
     try {
         const configuration = parseConfiguration();
 
-        const archivePath = await core.group('Archiving Application', async () => {
-            const archivePath = await archive(configuration)
+        const archivePath = await core.group("Archiving Application", async () => {
+            const archivePath = await archive(configuration);
             if (archivePath !== null) {
                 core.info(`Created application archive at ${archivePath}`);
             }
@@ -244,8 +234,8 @@ const main = async () => {
             return;
         }
 
-        const uuid = await core.group('Submitting for Notarizing', async () => {
-            let uuid = await submit({archivePath: archivePath, ...configuration});
+        const uuid = await core.group("Submitting for Notarizing", async () => {
+            let uuid = await submit({ archivePath: archivePath, ...configuration });
             if (uuid !== null) {
                 core.info(`Submitted package for notarization. Request UUID is ${uuid}`);
             }
@@ -259,8 +249,8 @@ const main = async () => {
 
         await sleep(15000); // TODO On a busy day, it can take a while before the build can be checked?
 
-        const success = await core.group('Waiting for Notarization Status', async () => {
-            return await wait({uuid: uuid, archivePath: archivePath, ...configuration})
+        const success = await core.group("Waiting for Notarization Status", async () => {
+            return await wait({ uuid: uuid, archivePath: archivePath, ...configuration });
         });
 
         if (success == false) {
@@ -268,11 +258,10 @@ const main = async () => {
             return;
         }
 
-        core.setOutput('product-path', configuration.productPath);
+        core.setOutput("product-path", configuration.productPath);
     } catch (error) {
         core.setFailed(`Notarization failed with an unexpected error: ${error.message}`);
     }
 };
-
 
 main();
